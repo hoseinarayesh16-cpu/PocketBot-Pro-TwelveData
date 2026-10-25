@@ -1,12 +1,287 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PocketBot Pro</title><style>
-:root{color-scheme:dark;--bg:#08101d;--panel:#121f30;--line:#293b52;--muted:#9bb0c7;--cyan:#4bd8ed;--green:#37e4ac;--red:#ff6b85;--yellow:#ffd27a}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#19314b,var(--bg) 55%);font:14px Tahoma,Arial;color:#eff7ff}main{max-width:1200px;margin:auto;padding:20px 14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px}h1{font-size:24px;margin:0}.accent{color:var(--cyan)}.muted{color:var(--muted);font-size:12px;line-height:1.8}.pill{border:1px solid var(--line);border-radius:30px;padding:10px 12px;color:var(--muted);font-size:12px}.panel{background:linear-gradient(145deg,#152439,#0e1928);border:1px solid var(--line);border-radius:17px;padding:17px;box-shadow:0 14px 35px #0002}.controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}.field{flex:1;min-width:130px}label{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}select,button{width:100%;padding:12px;border-radius:10px;font:inherit}select{background:#091727;color:white;border:1px solid #3b516c}button{background:var(--cyan);color:#061824;font-weight:bold;border:0;cursor:pointer;min-width:170px}button:disabled{opacity:.6}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.stats strong{display:block;margin-top:10px;font-size:18px;direction:ltr;text-align:right}.stats small{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr);gap:14px}.heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}h2{font-size:16px;margin:0}canvas{display:block;width:100%;height:350px;border-radius:12px;background:#091728}.signal{text-align:center;background:#091728;border:1px solid var(--line);border-radius:13px;padding:22px;margin:12px 0}.signal b{font-size:40px;display:block;direction:ltr}.signal p{color:var(--muted);font-size:12px}.wait{color:var(--yellow)}.call{color:var(--green)}.put{color:var(--red)}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{background:#091728;padding:12px;border-radius:10px}.metric span{font-size:12px;color:var(--muted)}.metric strong{display:block;direction:ltr;text-align:right;margin-top:9px}#reasons{line-height:2;color:#c4d6e8;padding-right:20px}#message{color:var(--yellow);line-height:1.9;font-size:12px;margin-top:12px;min-height:20px}.footer{margin-top:16px;color:var(--muted);font-size:12px;line-height:2}@media(max-width:800px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}canvas{height:290px}h1{font-size:21px}}@media(max-width:400px){.stats strong{font-size:15px}}
-</style></head><body><main><header><div><h1><span class="accent">◈</span> PocketBot <span class="accent">PRO</span></h1><div class="muted">داشبورد فارکس • Twelve Data • فقط تحلیل، بدون معامله خودکار</div></div><div class="pill" id="status">● آماده</div></header><section class="panel controls"><div class="field"><label>جفت‌ارز / نماد</label><select id="symbol"><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>USDCHF</option><option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option><option>EURGBP</option><option>EURJPY</option><option>GBPJPY</option><option>XAUUSD</option></select></div><div class="field"><label>تایم‌فریم</label><select id="tf"><option value="m1">M1</option><option value="m5" selected>M5</option><option value="m15">M15</option><option value="m30">M30</option><option value="h1">H1</option><option value="h4">H4</option><option value="d1">D1</option><option value="w1">W1</option></select></div><div><button id="load">↻ دریافت و تحلیل</button></div></section><section class="stats"><div class="panel"><small>آخرین Close</small><strong id="price">—</strong></div><div class="panel"><small>تعداد کندل</small><strong id="count">—</strong></div><div class="panel"><small>زمان کندل</small><strong id="time">—</strong></div><div class="panel"><small>زمان دریافت</small><strong id="received">—</strong></div></section><div class="layout"><section class="panel"><div class="heading"><h2>نمودار کندل‌استیک</h2><span class="pill" id="chartLabel">EURUSD · M5</span></div><canvas id="chart" aria-label="نمودار قیمت"></canvas><div id="message" aria-live="polite"></div></section><section class="panel"><div class="heading"><h2>موتور تحلیل</h2><span class="pill">آزمایشی</span></div><div class="signal"><b id="signal" class="wait">WAIT</b><p id="desc">منتظر داده معتبر</p></div><div class="metrics"><div class="metric"><span>RSI 14</span><strong id="rsi">—</strong></div><div class="metric"><span>EMA 9</span><strong id="ema9">—</strong></div><div class="metric"><span>EMA 21</span><strong id="ema21">—</strong></div><div class="metric"><span>روند</span><strong id="trend">—</strong></div></div><h2 style="margin-top:20px">دلایل تحلیل</h2><ul id="reasons"><li>ابتدا داده را دریافت کنید.</li></ul></section></div><p class="footer">⚠️ این ابزار توصیه مالی نیست. قیمت Twelve Data ممکن است با Pocket Option تفاوت داشته باشد. بدون تأیید زمان و تازگی کندل، سیگنال زنده صادر نمی‌شود. قبل از استفاده واقعی، نیازمند بک‌تست و اعتبارسنجی است.</p></main><script>
-const $=id=>document.getElementById(id);let candles=[];
-function ema(a,n){let v=a.slice(0,n).reduce((x,y)=>x+y,0)/n,k=2/(n+1);for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);return v}
-function rsi(a,n=14){let g=0,l=0;for(let i=1;i<=n;i++){let d=a[i]-a[i-1];g+=Math.max(d,0);l+=Math.max(-d,0)}g/=n;l/=n;for(let i=n+1;i<a.length;i++){let d=a[i]-a[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n}return l===0?(g===0?50:100):100-100/(1+g/l)}
-function draw(){const c=$('chart'),r=c.getBoundingClientRect(),w=Math.max(290,r.width),h=r.height,dpr=window.devicePixelRatio||1;c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);let x=c.getContext('2d');x.scale(dpr,dpr);x.clearRect(0,0,w,h);const a=candles.slice(-55);if(!a.length)return;let min=Math.min(...a.map(v=>v.low)),max=Math.max(...a.map(v=>v.high)),p=(max-min)*.1||.0001;min-=p;max+=p;let L=12,R=75,T=16,B=32,W=w-L-R,H=h-T-B,y=v=>T+(max-v)/(max-min)*H,step=W/a.length;x.font='11px Arial';x.textAlign='left';for(let i=0;i<=5;i++){let v=min+(max-min)*i/5,yy=y(v);x.strokeStyle='#273a50';x.beginPath();x.moveTo(L,yy);x.lineTo(w-R,yy);x.stroke();x.fillStyle='#99acc2';x.fillText(v.toFixed(5),w-R+8,yy+4)}a.forEach((v,i)=>{let xx=L+step*(i+.5),up=v.close>=v.open;x.strokeStyle=x.fillStyle=up?'#37e4ac':'#ff6b85';x.beginPath();x.moveTo(xx,y(v.high));x.lineTo(xx,y(v.low));x.stroke();x.fillRect(xx-step*.3,Math.min(y(v.open),y(v.close)),Math.max(2,step*.6),Math.max(1,Math.abs(y(v.open)-y(v.close))))});x.fillStyle='#99acc2';x.textAlign='center';[0,.25,.5,.75,1].forEach(f=>{let i=Math.floor((a.length-1)*f);x.fillText(a[i].time.slice(5,16),L+step*(i+.5),h-8)})}
-function reset(msg){candles=[];draw();for(let id of ['price','count','time','received','rsi','ema9','ema21','trend'])$(id).textContent='—';$('signal').textContent='WAIT';$('signal').className='wait';$('desc').textContent='سیگنال صادر نشد';$('message').textContent=msg;$('reasons').replaceChildren()}
-function analyze(data){candles=data.candles;let a=candles.map(c=>c.close),last=candles.at(-1),r=rsi(a),e9=ema(a,9),e21=ema(a,21);$('price').textContent=last.close.toFixed(5);$('count').textContent=candles.length;$('time').textContent=last.time;$('received').textContent=new Date(data.receivedAt).toLocaleString('fa-IR');$('rsi').textContent=r.toFixed(1);$('ema9').textContent=e9.toFixed(5);$('ema21').textContent=e21.toFixed(5);$('trend').textContent=e9>e21?'صعودی':e9<e21?'نزولی':'خنثی';$('chartLabel').textContent=data.symbol+' · '+data.tf.toUpperCase();draw();let reasons=[];let weekend=[0,6].includes(new Date().getUTCDay());let theoretical=weekend?'WAIT':r>=52&&r<=68&&e9>e21&&last.close>e9?'CALL':r<=48&&r>=32&&e9<e21&&last.close<e9?'PUT':'WAIT';if(weekend)reasons.push('امروز آخر هفته است؛ بازار معمول فارکس بسته است.');if(theoretical==='CALL')reasons.push('EMA9 بالای EMA21، RSI صعودی و قیمت بالای EMA9 است.');if(theoretical==='PUT')reasons.push('EMA9 پایین EMA21، RSI نزولی و قیمت پایین EMA9 است.');if(theoretical==='WAIT'&&!weekend)reasons.push('شرایط RSI و EMA برای یک جهت هم‌زمان تأیید نشده‌اند.');reasons.push('زمان کندل‌های API بدون منطقه زمانی صریح است؛ تازگی داده قابل تأیید نیست.');$('signal').textContent='WAIT';$('signal').className='wait';$('desc').textContent=theoretical==='WAIT'?'عدم تأیید شرایط':'الگوی '+theoretical+' شناسایی شد؛ تأیید تازگی داده لازم است';$('reasons').replaceChildren(...reasons.map(t=>{let li=document.createElement('li');li.textContent=t;return li}));$('message').textContent=(data.cached?'پاسخ کش‌شده سرور. ':'')+'به علت نامشخص بودن منطقه زمانی کندل، صدور سیگنال زنده غیرفعال است.'}
-async function load(){let b=$('load');b.disabled=true;$('status').textContent='● در حال دریافت';$('message').textContent='';try{let qs=new URLSearchParams({symbol:$('symbol').value,tf:$('tf').value});let response=await fetch('/api/candles?'+qs,{cache:'no-store'}),data=await response.json();if(!response.ok)throw Error(data.error||'خطای سرور');if(!Array.isArray(data.candles)||data.candles.length<55)throw Error('کندل کافی نیست');analyze(data);$('status').textContent='● اتصال برقرار'}catch(e){reset('خطا: '+e.message);$('status').textContent='● خطا در دریافت'}finally{b.disabled=false}}
-$('load').addEventListener('click',load);$('symbol').addEventListener('change',load);$('tf').addEventListener('change',load);window.addEventListener('resize',draw);load();
-</script></body></html>
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PocketBot Pro V2</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#08101d;--panel:#132238;
+  --line:#2b4059;--muted:#9cb0c7;
+  --cyan:#4bd8ed;--green:#37e4ac;
+  --red:#ff6b85;--yellow:#ffd27a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:linear-gradient(135deg,#19314b,var(--bg) 55%);
+  color:#eff7ff;font:14px Tahoma,Arial,sans-serif;
+}
+main{max-width:1200px;margin:auto;padding:18px 14px}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+h1{margin:0;font-size:25px}
+.accent{color:var(--cyan)}
+.muted{color:var(--muted);font-size:12px;line-height:2}
+.pill{border:1px solid var(--line);border-radius:25px;padding:10px;color:var(--muted);font-size:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin-bottom:14px}
+.controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.field{flex:1;min-width:125px}
+label{display:block;color:var(--muted);margin-bottom:8px}
+select,button{width:100%;padding:13px;border-radius:11px;font:inherit}
+select{background:#091727;color:white;border:1px solid #3b516c}
+button{background:var(--cyan);color:#061824;font-weight:bold;border:0;cursor:pointer}
+button:disabled{opacity:.6}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stats strong{display:block;margin-top:10px;font-size:18px;direction:ltr;text-align:right;overflow-wrap:anywhere}
+.stats small,.metric span{color:var(--muted)}
+.layout{display:grid;grid-template-columns:1.8fr 1fr;gap:14px}
+h2{font-size:17px;margin:0 0 15px}
+canvas{width:100%;height:340px;display:block;background:#091728;border-radius:12px}
+.signal{text-align:center;background:#091728;border:1px solid var(--line);border-radius:13px;padding:25px;margin:15px 0}
+.signal b{font-size:43px;display:block}
+.signal p{color:var(--muted)}
+.wait{color:var(--yellow)}
+.call{color:var(--green)}
+.put{color:var(--red)}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{background:#091728;padding:14px;border-radius:10px}
+.metric strong{display:block;margin-top:8px;direction:ltr;text-align:right}
+#reasons{line-height:2.2;color:#c4d6e8;padding-right:20px}
+#message{color:var(--yellow);line-height:2;margin-top:12px}
+.footer{color:var(--muted);line-height:2;font-size:12px}
+@media(max-width:800px){
+  .layout{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  canvas{height:290px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div>
+    <h1>◈ PocketBot <span class="accent">PRO V2</span></h1>
+    <div class="muted">Twelve Data • تحلیل فارکس • بدون معامله خودکار</div>
+  </div>
+  <div class="pill" id="status">● آماده</div>
+</header>
+
+<section class="panel controls">
+  <div class="field">
+    <label>جفت‌ارز / نماد</label>
+    <select id="symbol">
+      <option>EURUSD</option><option>GBPUSD</option>
+      <option>USDJPY</option><option>USDCHF</option>
+      <option>AUDUSD</option><option>USDCAD</option>
+      <option>NZDUSD</option><option>EURGBP</option>
+      <option>EURJPY</option><option>GBPJPY</option>
+      <option>XAUUSD</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>تایم‌فریم</label>
+    <select id="tf">
+      <option value="m1">M1</option>
+      <option value="m5" selected>M5</option>
+      <option value="m15">M15</option>
+      <option value="m30">M30</option>
+      <option value="h1">H1</option>
+      <option value="h4">H4</option>
+      <option value="d1">D1</option>
+      <option value="w1">W1</option>
+    </select>
+  </div>
+  <div class="field">
+    <button id="load">↻ دریافت و تحلیل</button>
+  </div>
+</section>
+
+<section class="stats">
+  <div class="panel"><small>آخرین Close</small><strong id="price">—</strong></div>
+  <div class="panel"><small>تعداد کندل</small><strong id="count">—</strong></div>
+  <div class="panel"><small>زمان کندل</small><strong id="time">—</strong></div>
+  <div class="panel"><small>زمان دریافت</small><strong id="received">—</strong></div>
+</section>
+
+<div class="layout">
+  <section class="panel">
+    <h2>نمودار کندل‌استیک <span id="chartLabel"></span></h2>
+    <canvas id="chart"></canvas>
+    <div id="message"></div>
+  </section>
+  <section class="panel">
+    <h2>موتور تحلیل تکنیکال</h2>
+    <div class="signal">
+      <b id="signal" class="wait">WAIT</b>
+      <p id="desc">منتظر دریافت داده</p>
+    </div>
+    <div class="metrics">
+      <div class="metric"><span>RSI 14</span><strong id="rsi">—</strong></div>
+      <div class="metric"><span>EMA 9</span><strong id="ema9">—</strong></div>
+      <div class="metric"><span>EMA 21</span><strong id="ema21">—</strong></div>
+      <div class="metric"><span>روند</span><strong id="trend">—</strong></div>
+    </div>
+    <h2 style="margin-top:20px">دلایل تحلیل</h2>
+    <ul id="reasons"><li>منتظر دریافت داده</li></ul>
+  </section>
+</div>
+
+<p class="footer">
+⚠️ این برنامه آزمایشی است. قیمت Twelve Data ممکن است با Pocket Option متفاوت باشد.
+سیگنال‌ها تضمین سود ندارند و نیازمند بک‌تست هستند.
+</p>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let candles=[];
+
+function ema(a,n){
+ let v=a.slice(0,n).reduce((x,y)=>x+y,0)/n;
+ let k=2/(n+1);
+ for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);
+ return v;
+}
+
+function rsi(a,n=14){
+ let g=0,l=0;
+ for(let i=1;i<=n;i++){
+  let d=a[i]-a[i-1];
+  g+=Math.max(d,0);l+=Math.max(-d,0);
+ }
+ g/=n;l/=n;
+ for(let i=n+1;i<a.length;i++){
+  let d=a[i]-a[i-1];
+  g=(g*(n-1)+Math.max(d,0))/n;
+  l=(l*(n-1)+Math.max(-d,0))/n;
+ }
+ return l===0?(g===0?50:100):100-100/(1+g/l);
+}
+
+function draw(){
+ const c=$('chart'),r=c.getBoundingClientRect();
+ const w=Math.max(290,r.width),h=r.height;
+ const dpr=window.devicePixelRatio||1;
+ c.width=w*dpr;c.height=h*dpr;
+ const x=c.getContext('2d');
+ x.scale(dpr,dpr);x.clearRect(0,0,w,h);
+ const a=candles.slice(-55);
+ if(!a.length)return;
+ let min=Math.min(...a.map(v=>v.low));
+ let max=Math.max(...a.map(v=>v.high));
+ let p=(max-min)*.1||.0001;
+ min-=p;max+=p;
+ const L=12,R=75,T=16,B=32,W=w-L-R,H=h-T-B;
+ const y=v=>T+(max-v)/(max-min)*H;
+ const step=W/a.length;
+ x.font='11px Arial';
+ for(let i=0;i<=5;i++){
+  let v=min+(max-min)*i/5,yy=y(v);
+  x.strokeStyle='#273a50';
+  x.beginPath();x.moveTo(L,yy);x.lineTo(w-R,yy);x.stroke();
+  x.fillStyle='#99acc2';
+  x.fillText(v.toFixed(5),w-R+8,yy+4);
+ }
+ a.forEach((v,i)=>{
+  let xx=L+step*(i+.5),up=v.close>=v.open;
+  x.strokeStyle=x.fillStyle=up?'#37e4ac':'#ff6b85';
+  x.beginPath();x.moveTo(xx,y(v.high));x.lineTo(xx,y(v.low));x.stroke();
+  x.fillRect(xx-step*.3,Math.min(y(v.open),y(v.close)),
+   Math.max(2,step*.6),Math.max(1,Math.abs(y(v.open)-y(v.close))));
+ });
+}
+
+function reset(msg){
+ candles=[];draw();
+ for(const id of ['price','count','time','received','rsi','ema9','ema21','trend'])
+  $(id).textContent='—';
+ $('signal').textContent='WAIT';
+ $('signal').className='wait';
+ $('desc').textContent='سیگنال صادر نشد';
+ $('message').textContent=msg;
+ $('reasons').replaceChildren();
+}
+
+function analyze(data){
+ candles=data.candles;
+ const a=candles.map(c=>c.close);
+ const last=candles.at(-1);
+ const r=rsi(a),e9=ema(a,9),e21=ema(a,21);
+
+ $('price').textContent=last.close.toFixed(5);
+ $('count').textContent=candles.length;
+ $('time').textContent=last.time;
+ $('received').textContent=new Date(data.receivedAt).toLocaleString('fa-IR');
+ $('rsi').textContent=r.toFixed(1);
+ $('ema9').textContent=e9.toFixed(5);
+ $('ema21').textContent=e21.toFixed(5);
+ $('trend').textContent=e9>e21?'صعودی':e9<e21?'نزولی':'خنثی';
+ $('chartLabel').textContent=data.symbol+' · '+data.tf.toUpperCase();
+ draw();
+
+ const f=data.freshness||{},reasons=[];
+ const allowed=f.signalAllowed===true;
+ let signal='WAIT';
+
+ if(f.weekend)reasons.push('آخر هفته است؛ بازار معمول فارکس تعطیل است.');
+ if(!f.timezoneConfirmed)reasons.push('منطقه زمانی UTC تأیید نشده است.');
+ if(!f.fresh)reasons.push('تازگی یا بسته‌شدن کندل تأیید نشده است.');
+
+ if(allowed&&r>=52&&r<=68&&e9>e21&&last.close>e9){
+  signal='CALL';
+  reasons.push('EMA9 بالاتر از EMA21 و RSI صعودی است.');
+ }else if(allowed&&r<=48&&r>=32&&e9<e21&&last.close<e9){
+  signal='PUT';
+  reasons.push('EMA9 پایین‌تر از EMA21 و RSI نزولی است.');
+ }else if(allowed){
+  reasons.push('شرایط لازم برای سیگنال تأیید نشده است.');
+ }
+
+ reasons.push('نتیجه آزمایشی است؛ قیمت را با پلتفرم مقصد مقایسه کنید.');
+ $('signal').textContent=signal;
+ $('signal').className=signal.toLowerCase();
+ $('desc').textContent=signal==='WAIT'?'عدم تأیید شرایط':'الگوی آزمایشی '+signal;
+ $('reasons').replaceChildren(...reasons.map(t=>{
+  let li=document.createElement('li');
+  li.textContent=t;
+  return li;
+ }));
+ $('message').textContent=
+  (data.cached?'پاسخ از کش سرور دریافت شد. ':'')+
+  (f.timezoneConfirmed?'منطقه زمانی UTC تأیید شده. ':'منطقه زمانی تأیید نشده. ')+
+  (typeof f.lastCandleAgeMinutes==='number'
+   ?'سن آخرین کندل: '+f.lastCandleAgeMinutes.toFixed(1)+' دقیقه. ':'');
+}
+
+async function load(){
+ const b=$('load');
+ b.disabled=true;
+ $('status').textContent='● در حال دریافت';
+ try{
+  const qs=new URLSearchParams({
+   symbol:$('symbol').value,tf:$('tf').value
+  });
+  const response=await fetch('/api/candles?'+qs,{cache:'no-store'});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||'خطای سرور');
+  if(!Array.isArray(data.candles)||data.candles.length<55)
+   throw Error('کندل کافی دریافت نشد');
+  analyze(data);
+  $('status').textContent='● اتصال برقرار';
+ }catch(e){
+  reset('خطا: '+e.message);
+  $('status').textContent='● خطا در دریافت';
+ }finally{
+  b.disabled=false;
+ }
+}
+
+$('load').addEventListener('click',load);
+$('symbol').addEventListener('change',load);
+$('tf').addEventListener('change',load);
+window.addEventListener('resize',draw);
+load();
+</script>
+</body>
+</html>
