@@ -493,6 +493,84 @@ app.get('/api/backtest', async (req, res) => {
   }
 });
 
+/* =========================================
+   PocketBot Pro V2.4
+   Advanced Backtest API
+   ========================================= */
+
+app.get('/api/backtest-v24', async (req, res) => {
+  const params = validateRequest(req, res);
+  if (!params) return;
+
+  const allowedTF = [
+    'm1', 'm5', 'm15', 'm30', 'h1', 'h4'
+  ];
+
+  if (!allowedTF.includes(params.tf)) {
+    return res.status(400).json({
+      error: 'V2.4 supports intraday timeframes only'
+    });
+  }
+
+  const payout = req.query.payout === undefined
+    ? 0.80
+    : Number(req.query.payout);
+
+  if (
+    !Number.isFinite(payout) ||
+    payout <= 0 ||
+    payout > 1
+  ) {
+    return res.status(400).json({
+      error: 'Payout must be between 0 and 1'
+    });
+  }
+
+  try {
+    const data = await loadCandles(
+      params.symbol,
+      params.tf,
+      200
+    );
+
+    if (!data.freshness.timezoneConfirmed) {
+      return res.status(409).json({
+        error: 'Candle timezone is not verified'
+      });
+    }
+
+    if (data.candles.length < 100) {
+      return res.status(409).json({
+        error: 'At least 100 closed candles required'
+      });
+    }
+
+    const result = runBacktestV24(data.candles, {
+      tfMinutes: minutes[params.tf],
+      payout: payout,
+      minADX: 20,
+      minATRPercent: 0.015,
+      maxATRPercent: 0.30
+    });
+
+    return res.json({
+      version: '2.4',
+      symbol: params.symbol,
+      tf: params.tf,
+      source: 'Twelve Data',
+      receivedAt: data.receivedAt,
+      backtest: result
+    });
+
+  } catch (error) {
+    console.error('V2.4 backtest:', error);
+
+    return res.status(error.status || 502).json({
+      error: String(error.message || error)
+    });
+  }
+});
+
 const PORT = process.env.PORT || 8787;
 
 app.listen(PORT, '0.0.0.0', () => {
