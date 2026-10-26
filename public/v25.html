@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PocketBot Pro V2.5 — داشبورد آزمایشی</title>
+<style>
+:root{color-scheme:dark;font-family:Tahoma,Arial,sans-serif;background:#081328;color:#eaf2ff}*{box-sizing:border-box}body{margin:0;padding:18px;max-width:980px;margin-inline:auto}h1{font-size:1.6rem;margin-bottom:6px}.muted{color:#9eafc9;font-size:.85rem}.panel{background:#101f38;border:1px solid #2b3e5e;border-radius:17px;padding:17px;margin:14px 0}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}label{display:block;color:#b5c5de;font-size:.85rem;margin-bottom:6px}select,input,button{width:100%;border-radius:10px;padding:13px;border:1px solid #40516c;background:#1d304e;color:#fff;font:inherit}button{background:#087f96;border:0;font-weight:bold;cursor:pointer;margin-top:13px}button:disabled{opacity:.5;cursor:wait}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{background:#142844;padding:16px;border-radius:12px}.metric b{font-size:1.5rem;display:block;margin-top:7px}.good{color:#5ee4a4}.bad{color:#ff8c95}.warn{color:#ffd18a}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}td,th{padding:10px;border-bottom:1px solid #30415e;text-align:right;font-size:.85rem}th{color:#9eb2d3}.pill{display:inline-block;padding:5px 10px;border-radius:20px;background:#223b60}#status{min-height:25px;margin-top:10px}small{line-height:1.9}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{flex:1;min-width:145px}.secondary{background:#243d60}.tag{font-size:.78rem;color:#8fcfe0}
+</style>
+</head>
+<body>
+<h1>📊 PocketBot PRO V2.5</h1>
+<div class="muted">داشبورد فارسی بک‌تست • Twelve Data • بدون اجرای خودکار معامله</div>
+<section class="panel"><div class="controls">
+<div><label for="symbol">نماد</label><select id="symbol"><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>USDCHF</option><option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option><option>EURGBP</option><option>EURJPY</option><option>GBPJPY</option><option>XAUUSD</option></select></div>
+<div><label for="tf">تایم‌فریم</label><select id="tf"><option value="m1">M1</option><option value="m5" selected>M5</option><option value="m15">M15</option><option value="m30">M30</option><option value="h1">H1</option><option value="h4">H4</option></select></div>
+<div><label for="payout">پرداخت فرضی (%)</label><input id="payout" type="number" value="80" min="1" max="100" step="1"></div>
+<div><label for="filter">فیلتر معاملات</label><select id="filter"><option value="ALL">همه</option><option value="CALL">CALL</option><option value="PUT">PUT</option></select></div>
+</div><button id="run">دریافت بک‌تست</button><div id="status" role="status" class="muted">برای شروع دکمه بالا را بزنید.</div></section>
+<section class="panel"><h3>خلاصه عملکرد</h3><div class="cards" id="metrics"><div class="metric">هنوز گزارشی دریافت نشده است.</div></div><p class="muted" id="detail"></p></section>
+<section class="panel"><h3>آخرین معاملات تاریخی</h3><div class="scroll"><table><thead><tr><th>زمان سیگنال (UTC)</th><th>جهت</th><th>ورود</th><th>خروج</th><th>نتیجه</th><th>RSI</th><th>ADX</th></tr></thead><tbody id="trades"><tr><td colspan="7">داده‌ای نیست.</td></tr></tbody></table></div></section>
+<section class="panel"><h3>گزارش‌های ذخیره‌شده در این مرورگر</h3><p class="muted">گزارش‌ها فقط روی همین دستگاه و همین مرورگر ذخیره می‌شوند؛ روی سرور ثبت نمی‌شوند.</p><div class="row"><button class="secondary" id="save">ذخیره گزارش فعلی</button><button class="secondary" id="export">خروجی JSON</button><button class="secondary" id="clear">پاک‌کردن تاریخچه</button></div><div id="history" class="muted" style="margin-top:15px"></div></section>
+<section class="panel"><small class="warn">⚠️ نرخ برد گذشته، تضمین نتیجه آینده نیست. این داده‌ها قیمت‌های Twelve Data هستند، نه لزوماً قیمت و پرداخت Pocket Option. ۲۰۰ کندل برای اعتبارسنجی راهبرد کافی نیست. برای معاملات واقعی از این صفحه به‌عنوان دستور ورود استفاده نکنید.</small></section>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);let current=null;
+const storageKey='pocketbot_v25_history';
+function safeHistory(){try{const x=JSON.parse(localStorage.getItem(storageKey)||'[]');return Array.isArray(x)?x:[]}catch{return []}}
+function num(v){return v===null||v===undefined?'—':String(v)}
+function metric(label,value,cls=''){return `<div class="metric"><span class="muted">${label}</span><b class="${cls}">${num(value)}</b></div>`}
+function render(){if(!current)return;const b=current.backtest,a=b.all,t=b.testing;
+$('metrics').innerHTML=metric('تعداد معاملات',a.total)+metric('نرخ برد تاریخی',num(a.winRate)+'٪',a.winRate>=b.minimumBreakEvenWinRate?'good':'bad')+metric('سود/زیان فرضی',num(a.netUnits)+' واحد',a.netUnits>=0?'good':'bad')+metric('نرخ برد بخش آزمایش',num(t.winRate)+'٪')+metric('CALL: برد / کل',`${b.call.wins} / ${b.call.total}`)+metric('PUT: برد / کل',`${b.put.wins} / ${b.put.total}`);
+$('detail').textContent=`${current.symbol} · ${current.tf.toUpperCase()} · پرداخت فرضی ${Math.round(b.payout*100)}٪ · نرخ سربه‌سر ${b.minimumBreakEvenWinRate}٪ · دریافت: ${current.receivedAt}`;
+const items=b.trades.filter(x=>$('filter').value==='ALL'||x.signal===$('filter').value);
+$('trades').innerHTML=items.length?items.map(x=>`<tr><td>${x.signalTime}</td><td><span class="pill">${x.signal}</span></td><td>${x.entry}</td><td>${x.exit}</td><td class="${x.result==='WIN'?'good':x.result==='LOSS'?'bad':''}">${x.result}</td><td>${num(x.rsi)}</td><td>${num(x.adx)}</td></tr>`).join(''):'<tr><td colspan="7">معامله‌ای برای این فیلتر نیست.</td></tr>';
+}
+function renderHistory(){const h=safeHistory();$('history').textContent=h.length?h.map(x=>`${x.savedAt} — ${x.symbol} ${x.tf} — ${x.backtest.all.total} معامله — ${num(x.backtest.all.winRate)}٪`).join('\n'):'هنوز گزارشی ذخیره نشده است.';$('history').style.whiteSpace='pre-line'}
+$('run').addEventListener('click',async()=>{const payout=Number($('payout').value);if(!Number.isFinite(payout)||payout<=0||payout>100){$('status').textContent='درصد پرداخت باید بین ۱ تا ۱۰۰ باشد.';return}const btn=$('run');btn.disabled=true;$('status').textContent='در حال دریافت اطلاعات...';try{const u=new URL('/api/backtest-v24',location.origin);u.searchParams.set('symbol',$('symbol').value);u.searchParams.set('tf',$('tf').value);u.searchParams.set('payout',String(payout/100));const response=await fetch(u,{cache:'no-store'});const data=await response.json();if(!response.ok)throw Error(data.error||'خطای سرور');if(!data.backtest||!data.backtest.all)throw Error('پاسخ نامعتبر');current=data;render();$('status').textContent='گزارش تاریخی دریافت شد.'}catch(e){$('status').textContent='خطا: '+e.message+' — این فایل باید روی همان دامنه سرور Render در پوشه public قرار گیرد.'}finally{btn.disabled=false}});
+$('filter').addEventListener('change',render);
+$('save').addEventListener('click',()=>{if(!current){$('status').textContent='ابتدا بک‌تست بگیرید.';return}try{const h=safeHistory();h.unshift({...current,savedAt:new Date().toISOString()});localStorage.setItem(storageKey,JSON.stringify(h.slice(0,30)));renderHistory();$('status').textContent='گزارش در مرورگر ذخیره شد.'}catch(e){$('status').textContent='فضای ذخیره مرورگر کافی نیست.'}});
+$('export').addEventListener('click',()=>{const data=current||safeHistory();if(!current&&!data.length){$('status').textContent='داده‌ای برای خروجی نیست.';return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='pocketbot-v25-report.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+$('clear').addEventListener('click',()=>{if(confirm('همه گزارش‌های ذخیره‌شده پاک شوند؟')){localStorage.removeItem(storageKey);renderHistory()}});
+renderHistory();
+</script>
+</body></html>
