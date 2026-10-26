@@ -1,6 +1,8 @@
 
 import express from 'express';
 
+import { runBacktestV24 } from './backtest-v24.js';
+
 const app = express();
 app.disable('x-powered-by');
 app.use(express.static('public'));
