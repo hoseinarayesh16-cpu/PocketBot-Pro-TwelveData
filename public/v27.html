@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PocketBot Pro V2.7 — پایش آینده‌نگر</title>
+<style>
+:root{color-scheme:dark;font-family:Tahoma,Arial,sans-serif;background:#081328;color:#eaf2ff}
+*{box-sizing:border-box}body{max-width:980px;margin:auto;padding:18px;font-family:Tahoma,Arial,sans-serif}
+h1{font-size:1.65rem}.muted{color:#a6b8d2;font-size:.86rem;line-height:2}.panel{background:#10213b;border:1px solid #2d4464;border-radius:18px;padding:18px;margin:16px 0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{display:block;margin-bottom:7px;color:#b4c6dc}select,input,button{font:inherit;width:100%;border:1px solid #435976;border-radius:11px;padding:12px;background:#203653;color:#fff}
+button{background:#087f96;border:0;font-weight:bold;cursor:pointer}button.secondary{background:#254364}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.row button{flex:1;min-width:140px}
+.card{background:#162d4a;border-radius:12px;padding:14px}.card strong{display:block;font-size:1.35rem;margin-top:8px}
+.good{color:#65e6a6}.bad{color:#ff9a9a}.warn{color:#ffd38e}
+.note{border-right:3px solid #ffd38e;padding-right:12px;line-height:2}
+table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{padding:10px;text-align:right;border-bottom:1px solid #304664;font-size:.83rem}
+.scroll{overflow-x:auto}a{color:#7bd8ed}
+</style></head><body>
+<h1>📡 PocketBot PRO V2.7</h1>
+<p class="muted">ثبت تصمیم آزمایشی پیش از ورود و تعیین نتیجه پس از پایان کندل — بدون معامله خودکار</p>
+<section class="panel">
+<div class="grid">
+<div><label for="symbol">نماد</label><select id="symbol"><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>USDCHF</option><option>AUDUSD</option><option>USDCAD</option><option>NZDUSD</option><option>EURGBP</option><option>EURJPY</option><option>GBPJPY</option><option>XAUUSD</option></select></div>
+<div><label for="tf">تایم‌فریم</label><select id="tf"><option value="m1">M1</option><option value="m5" selected>M5</option><option value="m15">M15</option><option value="m30">M30</option><option value="h1">H1</option><option value="h4">H4</option></select></div>
+<div><label for="payout">پرداخت فرضی (%)</label><input id="payout" type="number" min="1" max="100" value="80"></div>
+<div><label>فاصله بررسی</label><input disabled value="هر ۳۰ ثانیه"></div>
+</div>
+<div class="row"><button id="start">شروع پایش آزمایشی</button><button class="secondary" id="stop">توقف</button></div>
+<p id="status" class="muted" role="status">پایش خاموش است.</p>
+<p class="note muted">سیگنال تنها با کندل‌های بسته‌شده ساخته و با زمان واقعی مشاهده ثبت می‌شود. ورود برای شروع یک کندل کاملِ آینده برنامه‌ریزی می‌شود؛ قیمت ورود و نتیجه فقط بعد از بسته‌شدن همان کندل از داده Twelve Data خوانده می‌شوند. اگر داده دیر برسد یا کندل در دسترس نباشد، نتیجه «نامشخص» می‌ماند. پایش فقط با صفحه باز کار می‌کند.</p>
+</section>
+<section class="panel"><h3>آمار ثبت‌های آینده‌نگر</h3><div class="grid" id="stats"></div></section>
+<section class="panel"><h3>سیگنال‌ها و نتایج</h3><div class="scroll"><table><thead><tr><th>زمان ثبت (UTC)</th><th>نماد</th><th>فریم</th><th>جهت</th><th>ورود برنامه‌ریزی‌شده (UTC)</th><th>ورود</th><th>خروج</th><th>وضعیت</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="row"><button class="secondary" id="export">دریافت JSON</button><button class="secondary" id="clear">پاک‌کردن ثبت‌ها</button></div></section>
+<section class="panel"><p class="muted">نسخه قبلی برای بک‌تست تاریخی: <a href="/v26.html">داشبورد V2.6</a>. این ثبت‌ها فقط در همین مرورگر ذخیره می‌شوند؛ بستن صفحه پایش را متوقف می‌کند. آزمون آینده‌نگر با قیمت کندل منبع داده است و اجرای واقعی در Pocket Option، اختلاف قیمت، تأخیر، اسلیپیج یا تغییر پرداخت را شبیه‌سازی نمی‌کند. هیچ تضمینی برای سود وجود ندارد.</p></section>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), STORE='pocketbot_v27_forward_records';
+const durations={m1:1,m5:5,m15:15,m30:30,h1:60,h4:240};
+let active=false,timer=null,busy=false,config=null;
+const read=()=>{try{const v=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(v)?v:[]}catch{return []}};
+const write=a=>localStorage.setItem(STORE,JSON.stringify(a.slice(0,1500)));
+const iso=t=>new Date(t).toISOString();
+const parse=t=>Date.parse(String(t).replace(' ','T')+'Z');
+const fixed=x=>Number.isFinite(x)?String(Number(x.toFixed(6))):'—';
+function card(label,value){return '<div class="card"><span class="muted">'+label+'</span><strong>'+value+'</strong></div>'}
+function render(){
+ const a=read(),wins=a.filter(x=>x.status==='WIN').length,losses=a.filter(x=>x.status==='LOSS').length;
+ const pending=a.filter(x=>x.status==='PENDING').length,draws=a.filter(x=>x.status==='DRAW').length;
+ const rate=wins+losses?(100*wins/(wins+losses)).toFixed(2)+'٪':'—';
+ $('stats').innerHTML=card('کل ثبت‌ها',a.length)+card('در انتظار',pending)+card('برد / باخت',wins+' / '+losses)+card('نرخ برد تصمیم‌گیری‌شده',rate);
+ $('rows').replaceChildren();
+ for(const x of a.slice(0,150)){
+  const tr=document.createElement('tr');
+  for(const v of [x.observedAt,x.symbol,x.tf,x.signal,x.targetEntryUTC,fixed(x.entry),fixed(x.exit),x.status]){
+   const td=document.createElement('td');td.textContent=v;tr.appendChild(td);
+  }$('rows').appendChild(tr);
+ }
+ if(!a.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=8;td.textContent='هنوز سیگنالی پیش از ورود ثبت نشده است.';tr.appendChild(td);$('rows').appendChild(tr)}
+}
+function ema(vals,n){const out=Array(vals.length).fill(null);if(vals.length<n)return out;let x=vals.slice(0,n).reduce((a,b)=>a+b,0)/n;out[n-1]=x;for(let i=n;i<vals.length;i++){x=vals[i]*2/(n+1)+x*(n-1)/(n+1);out[i]=x}return out}
+function wilder(vals,n){const out=Array(vals.length).fill(null);if(vals.length<n)return out;let x=vals.slice(0,n).reduce((a,b)=>a+b,0)/n;out[n-1]=x;for(let i=n;i<vals.length;i++){x=(x*(n-1)+vals[i])/n;out[i]=x}return out}
+function lastSignal(data,ms){
+ const n=data.length;if(n<100)return null;
+ const close=data.map(c=>c.close),e9=ema(close,9),e21=ema(close,21),e50=ema(close,50);
+ let gain=0,loss=0;const rsi=Array(n).fill(null);
+ for(let i=1;i<=14;i++){const d=close[i]-close[i-1];gain+=Math.max(d,0);loss+=Math.max(-d,0)}
+ gain/=14;loss/=14;rsi[14]=loss===0?(gain===0?50:100):100-100/(1+gain/loss);
+ for(let i=15;i<n;i++){const d=close[i]-close[i-1];gain=(gain*13+Math.max(d,0))/14;loss=(loss*13+Math.max(-d,0))/14;rsi[i]=loss===0?(gain===0?50:100):100-100/(1+gain/loss)}
+ const tr=Array(n).fill(0),pdm=Array(n).fill(0),mdm=Array(n).fill(0);
+ for(let i=1;i<n;i++){const c=data[i],p=data[i-1];tr[i]=Math.max(c.high-c.low,Math.abs(c.high-p.close),Math.abs(c.low-p.close));const up=c.high-p.high,down=p.low-c.low;pdm[i]=up>down&&up>0?up:0;mdm[i]=down>up&&down>0?down:0}
+ const atr=[null,...wilder(tr.slice(1),14)],plus=wilder(pdm.slice(1),14),minus=wilder(mdm.slice(1),14),dx=Array(n).fill(null),adx=Array(n).fill(null);
+ for(let i=14;i<n;i++){if(!Number.isFinite(atr[i])||atr[i]<=0)continue;const a=100*plus[i-1]/atr[i],b=100*minus[i-1]/atr[i];dx[i]=a+b===0?0:100*Math.abs(a-b)/(a+b)}
+ let init=[];for(let i=14;i<n;i++){if(dx[i]===null)continue;init.push(dx[i]);if(init.length===14){let v=init.reduce((a,b)=>a+b,0)/14;adx[i]=v;for(let j=i+1;j<n;j++)if(dx[j]!==null){v=(v*13+dx[j])/14;adx[j]=v}break}}
+ const i=n-1,c=data[i],recent=data.slice(-6),day=new Date(c.timestamp).getUTCDay();
+ if([0,6].includes(day)||recent.length!==6||recent.some((v,j)=>j>0&&v.timestamp-recent[j-1].timestamp!==ms)||recent.filter(v=>v.high===v.low).length>=2)return null;
+ if(![atr[i],adx[i],rsi[i],e9[i],e21[i],e50[i]].every(Number.isFinite))return null;
+ const atrPct=atr[i]/c.close*100;
+ if(atrPct<0.015||atrPct>0.30||adx[i]<20||c.high-c.low>2.5*atr[i])return null;
+ let signal=null;
+ if(e9[i]>e21[i]&&e21[i]>e50[i]&&c.close>e9[i]&&rsi[i]>=53&&rsi[i]<=65)signal='CALL';
+ if(e9[i]<e21[i]&&e21[i]<e50[i]&&c.close<e9[i]&&rsi[i]>=35&&rsi[i]<=47)signal='PUT';
+ return signal?{signal,rsi:Number(rsi[i].toFixed(2)),adx:Number(adx[i].toFixed(2)),atrPercent:Number(atrPct.toFixed(4))}:null;
+}
+async function poll(){
+ if(!active||busy)return;busy=true;
+ try{
+  const now=Date.now(),ms=durations[config.tf]*60000;
+  const u=new URL('/api/candles',location.origin);u.searchParams.set('symbol',config.symbol);u.searchParams.set('tf',config.tf);
+  const response=await fetch(u,{cache:'no-store'}),body=await response.json();
+  if(!response.ok)throw Error(body.error||'دریافت کندل ناموفق بود');
+  if(!body.freshness?.timezoneConfirmed||!body.freshness?.fresh||body.freshness?.weekend||!body.freshness?.signalAllowed)throw Error('داده تازه یا منطقه زمانی تأیید نشده است');
+  const data=body.candles.map(c=>({...c,open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close),timestamp:parse(c.time)})).sort((a,b)=>a.timestamp-b.timestamp);
+  if(data.length<100||data.some(c=>!Number.isFinite(c.timestamp)))throw Error('داده کافی نیست');
+  let records=read(),changed=false;
+  // Resolve ONLY records committed during earlier polls. Never create and settle in the same poll.
+  for(const r of records){
+   if(r.status!=='PENDING'||r.symbol!==config.symbol||r.tf!==config.tf)continue;
+   const target=Date.parse(r.targetEntryUTC);
+   if(now<target+ms+15000)continue;
+   const candle=data.find(c=>c.timestamp===target);
+   if(candle&&candle.timestamp+ms<=now){
+    r.entry=candle.open;r.exit=candle.close;r.resolvedAt=iso(now);
+    r.status=r.entry===r.exit?'DRAW':r.signal==='CALL'?(r.exit>r.entry?'WIN':'LOSS'):(r.exit<r.entry?'WIN':'LOSS');changed=true;
+   }else if(now>target+ms*3){r.status='UNKNOWN';r.resolvedAt=iso(now);changed=true}
+  }
+  const last=data.at(-1),closedAt=last.timestamp+ms;
+  // Decision must be fresh, and scheduled for a whole future candle (never the current candle).
+  if(now-closedAt<=Math.min(ms,120000)&&now>=closedAt){
+   const result=lastSignal(data,ms);
+   if(result){
+    const target=(Math.floor(now/ms)+1)*ms;
+    const id=config.symbol+':'+config.tf+':'+last.time+':'+result.signal;
+    if(!records.some(r=>r.id===id)){
+     records.unshift({id,symbol:config.symbol,tf:config.tf,signal:result.signal,
+      observedAt:iso(now),sourceCandleUTC:iso(last.timestamp),targetEntryUTC:iso(target),
+      expiryMinutes:durations[config.tf],payout:config.payout,status:'PENDING',entry:null,exit:null,...result});
+     changed=true;
+    }
+   }
+  }
+  if(changed){write(records);render()}
+  $('status').textContent='پایش فعال • آخرین بررسی: '+new Date().toLocaleTimeString('fa-IR')+' • '+(changed?'ثبت‌ها به‌روز شدند':'سیگنال تازه‌ای نبود');
+ }catch(e){$('status').textContent='پایش فعال، اما بررسی ناموفق: '+e.message}
+ finally{busy=false}
+}
+function stop(){active=false;clearInterval(timer);timer=null;$('status').textContent='پایش متوقف است.';$('start').disabled=false}
+$('start').onclick=()=>{
+ if(active)return;
+ const payout=Number($('payout').value);
+ if(!Number.isFinite(payout)||payout<=0||payout>100){$('status').textContent='پرداخت باید بین ۱ تا ۱۰۰ باشد';return}
+ config={symbol:$('symbol').value,tf:$('tf').value,payout:payout/100};
+ active=true;$('start').disabled=true;$('status').textContent='در حال اولین بررسی...';
+ poll();timer=setInterval(poll,30000);
+};
+$('stop').onclick=stop;
+$('symbol').onchange=stop;$('tf').onchange=stop;$('payout').onchange=stop;
+$('clear').onclick=()=>{if(confirm('همه ثبت‌های V2.7 پاک شوند؟')){localStorage.removeItem(STORE);render()}};
+$('export').onclick=()=>{const b=new Blob([JSON.stringify({version:'2.7',exportedAt:iso(Date.now()),records:read()},null,2)],{type:'application/json'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='pocketbot-v27-forward.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1500)};
+render();
+</script></body></html>
