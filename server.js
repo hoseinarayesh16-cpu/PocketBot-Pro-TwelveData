@@ -46,11 +46,59 @@ const cache = new Map();
 app.get('/health', (_, res) => {
   res.json({
     ok: true,
-    version: '2.1',
+    version: '2.2',
     source: 'Twelve Data',
     configured: Boolean(process.env.TWELVE_DATA_API_KEY)
   });
 });
+
+function parseUTC(value) {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return NaN;
+  }
+  return Date.parse(value.replace(' ', 'T') + 'Z');
+}
+
+function normalizeCandles(values) {
+  return values.map(v => ({
+    time: v.datetime,
+    open: Number(v.open),
+    high: Number(v.high),
+    low: Number(v.low),
+    close: Number(v.close)
+  }))
+  .filter(v =>
+    [v.open, v.high, v.low, v.close].every(Number.isFinite) &&
+    v.high >= Math.max(v.open, v.close) &&
+    v.low <= Math.min(v.open, v.close)
+  )
+  .reverse();
+}
+
+async function requestSeries(symbol, interval, apiKey, timezone, outputsize) {
+  const url = new URL('https://api.twelvedata.com/time_series');
+
+  url.search = new URLSearchParams({
+    symbol,
+    interval,
+    outputsize: String(outputsize),
+    timezone,
+    apikey: apiKey,
+    format: 'JSON'
+  }).toString();
+
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(18000)
+  });
+
+  const body = await response.json();
+
+  if (!response.ok || body.status === 'error' || !Array.isArray(body.values)) {
+    throw new Error(body.message || 'خطا در دریافت کندل‌ها');
+  }
+
+  return body;
+}
 
 app.get('/api/candles', async (req, res) => {
   const symbol = String(req.query.symbol || 'EURUSD').toUpperCase();
@@ -66,145 +114,142 @@ app.get('/api/candles', async (req, res) => {
 
   if (!apiKey) {
     return res.status(503).json({
-      error: 'کلید API روی سرور تنظیم نشده است'
+      error: 'کلید API تنظیم نشده است'
     });
   }
 
-  const cacheKey = `${symbol}:${tf}`;
-  const old = cache.get(cacheKey);
+  const cacheKey = symbol + ':' + tf;
+  const cached = cache.get(cacheKey);
 
-  if (old && Date.now() - old.at < 60000) {
-    return res.json({
-      ...old.data,
-      cached: true
-    });
+  if (cached && Date.now() - cached.at < 60000) {
+    return res.json({ ...cached.data, cached: true });
   }
 
   try {
-    const url = new URL(
-      'https://api.twelvedata.com/time_series'
+    const primary = await requestSeries(
+      symbols[symbol],
+      intervals[tf],
+      apiKey,
+      'UTC',
+      200
     );
 
-    url.search = new URLSearchParams({
-      symbol: symbols[symbol],
-      interval: intervals[tf],
-      outputsize: '200',
-      timezone: 'UTC',
-      apikey: apiKey,
-      format: 'JSON'
-    }).toString();
-
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(18000)
-    });
-
-    const body = await response.json();
-
-    if (
-      !response.ok ||
-      body.status === 'error' ||
-      !Array.isArray(body.values)
-    ) {
-      throw new Error(
-        body.message || 'داده معتبر دریافت نشد'
-      );
-    }
-
-    const candles = body.values.map(v => ({
-      time: v.datetime,
-      open: Number(v.open),
-      high: Number(v.high),
-      low: Number(v.low),
-      close: Number(v.close)
-    }))
-    .filter(v =>
-      [v.open, v.high, v.low, v.close]
-        .every(Number.isFinite) &&
-      v.high >= Math.max(v.open, v.close) &&
-      v.low <= Math.min(v.open, v.close)
-    )
-    .reverse();
+    const candles = normalizeCandles(primary.values);
 
     if (candles.length < 55) {
-      throw new Error('تعداد کندل کافی نیست');
+      throw new Error('کندل کافی دریافت نشد');
     }
 
-    const meta = body.meta || {};
+    const reportedTimezone = String(
+      primary.meta?.timezone || ''
+    ).trim();
 
-    // منطقه زمانی پاسخ را مستقل از درخواست بررسی می‌کنیم.
-    const reportedTimezone =
-      String(meta.timezone || '').trim();
+    let timezoneConfirmed =
+      /^(UTC|Etc\/UTC|GMT|Etc\/GMT)$/i.test(reportedTimezone);
 
-    const isUTC = value =>
-      /^(UTC|Etc\/UTC|GMT|Etc\/GMT|Z)$/i.test(value);
+    let verification = timezoneConfirmed
+      ? 'provider_metadata'
+      : 'unverified';
 
-    const timezoneConfirmed = isUTC(reportedTimezone);
+    // فقط برای تایم‌فریم‌های درون‌روزی تلاش به تأیید مستقل می‌کنیم.
+    // درخواست دوم ممکن است سهمیه API را مصرف کند.
+    if (!timezoneConfirmed && minutes[tf] < 1440) {
+      try {
+        const comparison = await requestSeries(
+          symbols[symbol],
+          intervals[tf],
+          apiKey,
+          'America/New_York',
+          5
+        );
 
-    const last = candles.at(-1);
+        const primaryLast = primary.values[0];
+        const comparisonLast = comparison.values[0];
 
-    let candleTimestamp = NaN;
+        if (primaryLast && comparisonLast) {
+          const utcTime = parseUTC(primaryLast.datetime);
 
-    if (
-      timezoneConfirmed &&
-      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(last.time)
-    ) {
-      candleTimestamp = Date.parse(
-        last.time.replace(' ', 'T') + 'Z'
-      );
+          const nyString = comparisonLast.datetime;
+
+          // اختلاف ساعت نیویورک با UTC برای همان لحظه
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hourCycle: 'h23'
+          });
+
+          const parts = Object.fromEntries(
+            formatter.formatToParts(new Date(utcTime))
+              .filter(p => p.type !== 'literal')
+              .map(p => [p.type, p.value])
+          );
+
+          const expectedNY =
+            `${parts.year}-${parts.month}-${parts.day} ` +
+            `${parts.hour}:${parts.minute}:${parts.second}`;
+
+          const samePrice =
+            Number(primaryLast.close) ===
+            Number(comparisonLast.close);
+
+          const sameBar =
+            Number.isFinite(utcTime) &&
+            expectedNY === nyString &&
+            samePrice;
+
+          if (sameBar) {
+            timezoneConfirmed = true;
+            verification = 'independent_timezone_comparison';
+          }
+        }
+      } catch (error) {
+        console.warn('Timezone verification:', error.message);
+      }
     }
 
-    const ageMinutes = Number.isFinite(candleTimestamp)
-      ? (Date.now() - candleTimestamp) / 60000
-      : null;
-
-    const intervalMinutes = minutes[tf];
-
-    const maximumAgeMinutes = Math.max(
-      intervalMinutes * 3,
-      15
-    );
-
-    // آخرین کندل ممکن است هنوز باز باشد.
-    // بنابراین کندل بسته‌شده قبلی را مبنای تحلیل قرار می‌دهیم.
+    const intervalMs = minutes[tf] * 60000;
     const now = Date.now();
 
-    let closedCandles = candles;
+    let closedCandles = [];
 
     if (timezoneConfirmed) {
       closedCandles = candles.filter(c => {
-        const t = Date.parse(
-          c.time.replace(' ', 'T') + 'Z'
-        );
+        const timestamp = parseUTC(c.time);
 
-        return Number.isFinite(t) &&
-          t + intervalMinutes * 60000 <= now;
+        return Number.isFinite(timestamp) &&
+          timestamp + intervalMs <= now;
       });
     }
 
     const lastClosed = closedCandles.at(-1);
 
-    const lastClosedTime =
-      timezoneConfirmed && lastClosed
-        ? Date.parse(
-            lastClosed.time.replace(' ', 'T') + 'Z'
-          )
-        : NaN;
+    const lastClosedTimestamp = lastClosed
+      ? parseUTC(lastClosed.time)
+      : NaN;
 
-    const closedAgeMinutes =
-      Number.isFinite(lastClosedTime)
-        ? (now - lastClosedTime) / 60000
-        : null;
+    const ageMinutes = Number.isFinite(lastClosedTimestamp)
+      ? (now - lastClosedTimestamp) / 60000
+      : null;
+
+    const maximumAgeMinutes = Math.max(
+      minutes[tf] * 3,
+      15
+    );
 
     const fresh =
       timezoneConfirmed &&
       closedCandles.length >= 55 &&
-      closedAgeMinutes !== null &&
-      closedAgeMinutes >= intervalMinutes &&
-      closedAgeMinutes <= maximumAgeMinutes;
+      ageMinutes !== null &&
+      ageMinutes >= minutes[tf] &&
+      ageMinutes <= maximumAgeMinutes;
 
     const day = new Date().getUTCDay();
 
-    // محافظه‌کارانه: آخر هفته سیگنال صادر نمی‌شود.
     const weekend = day === 0 || day === 6;
 
     const signalAllowed = fresh && !weekend;
@@ -221,13 +266,14 @@ app.get('/api/candles', async (req, res) => {
         timezoneRequested: 'UTC',
         timezoneReported: reportedTimezone || null,
         timezoneConfirmed,
-        lastCandleAgeMinutes: closedAgeMinutes ?? ageMinutes,
+        verification,
+        lastCandleAgeMinutes: ageMinutes,
         maximumAgeMinutes,
         fresh,
         weekend,
         signalAllowed
       },
-      note: 'سیگنال‌ها آزمایشی هستند و قیمت ممکن است با Pocket Option متفاوت باشد'
+      note: 'تحلیل آزمایشی؛ قیمت ممکن است با Pocket Option متفاوت باشد'
     };
 
     cache.set(cacheKey, {
@@ -247,5 +293,5 @@ app.get('/api/candles', async (req, res) => {
 const PORT = process.env.PORT || 8787;
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`PocketBot Pro V2.1 running on port ${PORT}`);
+  console.log('PocketBot Pro V2.2 running');
 });
